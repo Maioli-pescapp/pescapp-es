@@ -1,5 +1,5 @@
 // service-worker.js - VERSÃO OTIMIZADA
-const CACHE_NAME = 'pescapp-v1.3';
+const CACHE_NAME = 'pescapp-v1.4';
 const OFFLINE_PAGE = '/index.html';
 
 // URLs para cache (prioridade: essenciais primeiro)
