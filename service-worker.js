@@ -1,312 +1,108 @@
-// service-worker.js - VERSÃO OTIMIZADA
-const CACHE_NAME = 'pescapp-v1.5';
-const OFFLINE_PAGE = '/index.html';
+// service-worker.js - VERSÃO NUCLEAR v2.0
+const CACHE_NAME = 'pescapp-NUKE-v2.0';
+const OFFLINE_URL = '/index.html';
 
-// URLs para cache (prioridade: essenciais primeiro)
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/css/style.css',
-  '/js/app.js',
-  '/js/api-integrations.js',
-  '/js/data/database-es.js',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
-  '/manifest.json'
-];
-
-// Recursos externos (CDN)
-const externalResources = [
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-  'https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css',
-  'https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js'
-];
-
-// Instalação - cache dos arquivos essenciais
+// Instalação FORÇADA
 self.addEventListener('install', event => {
-  console.log('[SW] 📦 Instalando Service Worker...');
+  console.log('[SW] 💥 INSTALAÇÃO NUCLEAR - v2.0');
   self.skipWaiting();
   
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('[SW] 📂 Cache aberto');
-        
-        // Cache de arquivos essenciais (prioridade)
-        return cache.addAll(urlsToCache)
-          .then(() => {
-            console.log('[SW] ✅ Arquivos essenciais em cache');
-            
-            // Tenta cache de recursos externos (não bloqueante)
-            return Promise.all(
-              externalResources.map(url => 
-                fetch(url)
-                  .then(response => {
-                    if (response.ok) {
-                      cache.put(url, response);
-                      console.log(`[SW] 🔗 ${url} - em cache`);
-                    }
-                  })
-                  .catch(() => {
-                    console.log(`[SW] ⚠️ ${url} - falha no cache (pode usar online)`);
-                  })
-              )
-            );
-          });
-      })
-      .then(() => {
-        console.log('[SW] 🚀 Pula espera para ativação imediata');
-        return self.skipWaiting();
-      })
-      .catch(error => {
-        console.error('[SW] ❌ Erro na instalação:', error);
-      })
-  );
-});
-
-// Ativação - limpa caches antigos
-self.addEventListener('activate', event => {
-  console.log('[SW] 🔄 Ativando Service Worker...');
-  
+  // Deleta TODOS os caches antigos
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cache => {
-          if (cache !== CACHE_NAME) {
-            console.log(`[SW] 🗑️ Removendo cache antigo: ${cache}`);
-            return caches.delete(cache);
-          }
+          console.log(`[SW] 💣 Destruindo cache: ${cache}`);
+          return caches.delete(cache);
         })
       );
-    })
-    .then(() => {
-      console.log('[SW] ✅ Cache limpo com sucesso!');
-      return self.clients.claim();
-    })
-    .then(() => {
-      console.log('[SW] 👑 Service Worker pronto para controlar clientes');
+    }).then(() => {
+      console.log('[SW] ✅ Todos os caches destruídos');
+      return caches.open(CACHE_NAME);
+    }).then(cache => {
+      console.log('[SW] 📦 Cache limpo criado');
+      return cache.addAll([
+        OFFLINE_URL,
+        '/',
+        '/manifest.json',
+        '/service-worker.js'
+      ]);
     })
   );
 });
 
-// Função para servir página offline
-function serveOfflinePage() {
-  return new Response(
-    `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PescApp - Offline</title>
-        <style>
-            body { font-family: Arial; padding: 20px; text-align: center; }
-            h1 { color: #3498db; }
-            button { background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 5px; }
-        </style>
-    </head>
-    <body>
-        <h1>📡 Sem conexão</h1>
-        <p>Você está offline. Conecte-se à internet para dados atualizados.</p>
-        <p>Algumas funcionalidades podem estar disponíveis.</p>
-        <button onclick="location.reload()">Tentar novamente</button>
-    </body>
-    </html>
-    `,
-    {
-      headers: { 'Content-Type': 'text/html' }
-    }
+// Ativação IMEDIATA
+self.addEventListener('activate', event => {
+  console.log('[SW] ⚡ ATIVAÇÃO IMEDIATA');
+  event.waitUntil(
+    Promise.all([
+      self.clients.claim(),
+      caches.keys().then(cacheNames => {
+        return Promise.all(
+          cacheNames.map(cache => {
+            if (cache !== CACHE_NAME) {
+              console.log(`[SW] 🗑️ Removendo cache antigo: ${cache}`);
+              return caches.delete(cache);
+            }
+          })
+        );
+      })
+    ])
   );
-}
+});
 
-// Estratégia: Cache First, com fallback para rede
+// Estratégia SIMPLES e INFALÍVEL
 self.addEventListener('fetch', event => {
-  // Ignora requisições não-GET e de extensões
-  if (event.request.method !== 'GET' || 
-      event.request.url.startsWith('chrome-extension://') ||
-      event.request.url.includes('sockjs-node')) {
-    return;
-  }
+  // Ignora requisições não-GET
+  if (event.request.method !== 'GET') return;
   
-  // URLs de API (sempre busca na rede primeiro)
-  if (event.request.url.includes('/api/') || 
-      event.request.url.includes('weather-api') ||
-      event.request.url.includes('tide-api')) {
-    networkFirstStrategy(event);
-    return;
-  }
-  
-  // Para HTML e navegação: Network First com fallback para cache
-  if (event.request.mode === 'navigate') {
-    networkFirstWithOfflineFallback(event);
-    return;
-  }
-  
-  // Para outros recursos: Cache First com fallback para rede
-  cacheFirstStrategy(event);
-});
-
-function networkFirstWithOfflineFallback(event) {
-  // Para navegação, sempre tenta cache primeiro para PWA instalado
+  // Para navegação (PWA instalado)
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      caches.match('/index.html')
-        .then(cachedResponse => {
-          if (cachedResponse) {
-            console.log('[SW] 🏠 Servindo index.html do cache');
-            return cachedResponse;
-          }
-          
-          // Se não tem no cache, busca na rede
-          return fetch(event.request)
-            .then(networkResponse => {
-              // Atualiza cache
-              const responseClone = networkResponse.clone();
-              caches.open(CACHE_NAME)
-                .then(cache => cache.put('/index.html', responseClone));
-              return networkResponse;
-            })
-            .catch(() => {
-              console.log('[SW] 🔌 Offline - página personalizada');
-              return serveOfflinePage();
-            });
+      fetch(event.request)
+        .catch(() => {
+          console.log('[SW] 🔌 Offline - servindo página principal');
+          return caches.match(OFFLINE_URL);
+        })
+        .then(response => {
+          return response || caches.match(OFFLINE_URL);
         })
     );
     return;
   }
   
-  // Para outros recursos, estratégia normal
-  event.respondWith(
-    fetch(event.request)
-      .then(networkResponse => {
-        const responseClone = networkResponse.clone();
-        caches.open(CACHE_NAME)
-          .then(cache => cache.put(event.request, responseClone));
-        return networkResponse;
-      })
-      .catch(() => {
-        return caches.match(event.request)
-          .then(cachedResponse => {
-            return cachedResponse || serveOfflinePage();
-          });
-      })
-  );
-}
-
-// Estratégia: Cache First (para recursos estáticos)
-function cacheFirstStrategy(event) {
+  // Para outros recursos
   event.respondWith(
     caches.match(event.request)
-      .then(cachedResponse => {
-        if (cachedResponse) {
-          console.log(`[SW] 📦 Do cache: ${event.request.url}`);
-          return cachedResponse;
+      .then(cached => {
+        // Retorna do cache se tem
+        if (cached) {
+          console.log(`[SW] 📦 Cache: ${event.request.url}`);
+          return cached;
         }
         
-        // Busca na rede
+        // Se não tem, busca na rede
         return fetch(event.request)
           .then(networkResponse => {
-            // Se a resposta é válida, adiciona ao cache
-            if (networkResponse && networkResponse.status === 200) {
-              const responseClone = networkResponse.clone();
-              caches.open(CACHE_NAME)
-                .then(cache => cache.put(event.request, responseClone));
-            }
+            // Guarda no cache para próxima vez
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME)
+              .then(cache => cache.put(event.request, responseClone));
             return networkResponse;
           })
           .catch(error => {
-            console.log(`[SW] ❌ Erro na rede: ${event.request.url}`, error);
-            
-            // Para CSS/JS, retorna resposta vazia para não quebrar a página
+            console.log(`[SW] ❌ Erro: ${event.request.url}`, error);
+            // Se for CSS/JS, retorna vazio
             if (event.request.url.includes('.css')) {
-              return new Response('', { 
-                headers: { 'Content-Type': 'text/css' } 
-              });
+              return new Response('', { headers: { 'Content-Type': 'text/css' } });
             }
             if (event.request.url.includes('.js')) {
-              return new Response('console.log("Recurso offline");', { 
-                headers: { 'Content-Type': 'application/javascript' } 
-              });
+              return new Response('// Offline', { headers: { 'Content-Type': 'application/javascript' } });
             }
-            
             throw error;
           });
       })
   );
-}
-
-// Estratégia: Network First (para APIs)
-function networkFirstStrategy(event) {
-  event.respondWith(
-    fetch(event.request)
-      .then(networkResponse => {
-        return networkResponse;
-      })
-      .catch(() => {
-        // Se offline, tenta buscar do cache (dados antigos)
-        return caches.match(event.request)
-          .then(cachedResponse => {
-            if (cachedResponse) {
-              console.log(`[SW] 📊 API do cache (dados antigos): ${event.request.url}`);
-              return cachedResponse;
-            }
-            return new Response(
-              JSON.stringify({ error: 'offline', message: 'Conecte-se à internet para dados atualizados' }),
-              { 
-                headers: { 
-                  'Content-Type': 'application/json',
-                  'X-SW-Offline': 'true'
-                } 
-              }
-            );
-          });
-      })
-  );
-}
-
-// Mensagens do app principal
-self.addEventListener('message', event => {
-  console.log('[SW] 📨 Mensagem recebida:', event.data);
-  
-  switch (event.data.action) {
-    case 'skipWaiting':
-      self.skipWaiting();
-      break;
-      
-    case 'clearCache':
-      caches.delete(CACHE_NAME)
-        .then(() => {
-          console.log('[SW] 🗑️ Cache limpo por solicitação');
-        });
-      break;
-      
-    case 'getCacheSize':
-      caches.open(CACHE_NAME)
-        .then(cache => cache.keys())
-        .then(keys => {
-          event.ports[0].postMessage({ size: keys.length });
-        });
-      break;
-  }
 });
 
-// Evento de sincronização em background (para futuras funcionalidades)
-self.addEventListener('sync', event => {
-  if (event.tag === 'sync-favorites') {
-    console.log('[SW] 🔄 Sincronizando dados em background...');
-    event.waitUntil(syncFavorites());
-  }
-});
-
-// Exemplo: função de sincronização
-function syncFavorites() {
-  return new Promise((resolve) => {
-    console.log('[SW] ⏳ Sincronização simulada...');
-    setTimeout(() => {
-      console.log('[SW] ✅ Sincronização completa');
-      resolve();
-    }, 1000);
-  });
-}
+console.log('[SW] 🚀 Service Worker NUCLEAR carregado!');
