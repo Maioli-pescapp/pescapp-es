@@ -91,6 +91,36 @@ self.addEventListener('activate', event => {
   );
 });
 
+// Função para servir página offline
+function serveOfflinePage() {
+  return new Response(
+    `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>PescApp - Offline</title>
+        <style>
+            body { font-family: Arial; padding: 20px; text-align: center; }
+            h1 { color: #3498db; }
+            button { background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 5px; }
+        </style>
+    </head>
+    <body>
+        <h1>📡 Sem conexão</h1>
+        <p>Você está offline. Conecte-se à internet para dados atualizados.</p>
+        <p>Algumas funcionalidades podem estar disponíveis.</p>
+        <button onclick="location.reload()">Tentar novamente</button>
+    </body>
+    </html>
+    `,
+    {
+      headers: { 'Content-Type': 'text/html' }
+    }
+  );
+}
+
 // Estratégia: Cache First, com fallback para rede
 self.addEventListener('fetch', event => {
   // Ignora requisições não-GET e de extensões
@@ -118,30 +148,48 @@ self.addEventListener('fetch', event => {
   cacheFirstStrategy(event);
 });
 
-// Estratégia: Network First (para navegação e dados dinâmicos)
 function networkFirstWithOfflineFallback(event) {
+  // Para navegação, sempre tenta cache primeiro para PWA instalado
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      caches.match('/index.html')
+        .then(cachedResponse => {
+          if (cachedResponse) {
+            console.log('[SW] 🏠 Servindo index.html do cache');
+            return cachedResponse;
+          }
+          
+          // Se não tem no cache, busca na rede
+          return fetch(event.request)
+            .then(networkResponse => {
+              // Atualiza cache
+              const responseClone = networkResponse.clone();
+              caches.open(CACHE_NAME)
+                .then(cache => cache.put('/index.html', responseClone));
+              return networkResponse;
+            })
+            .catch(() => {
+              console.log('[SW] 🔌 Offline - página personalizada');
+              return serveOfflinePage();
+            });
+        })
+    );
+    return;
+  }
+  
+  // Para outros recursos, estratégia normal
   event.respondWith(
     fetch(event.request)
       .then(networkResponse => {
-        // Atualiza o cache com a nova resposta
         const responseClone = networkResponse.clone();
         caches.open(CACHE_NAME)
           .then(cache => cache.put(event.request, responseClone));
-        
         return networkResponse;
       })
       .catch(() => {
-        console.log(`[SW] 🔌 Offline - servindo página do cache`);
-        return caches.match(OFFLINE_PAGE)
+        return caches.match(event.request)
           .then(cachedResponse => {
-            if (cachedResponse) {
-              return cachedResponse;
-            }
-            // Página offline customizada
-            return new Response(
-              '<h1>Você está offline</h1><p>Conecte-se à internet para usar todas as funcionalidades.</p>',
-              { headers: { 'Content-Type': 'text/html' } }
-            );
+            return cachedResponse || serveOfflinePage();
           });
       })
   );
